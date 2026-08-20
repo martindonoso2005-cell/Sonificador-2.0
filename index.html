@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonificador de Imágenes - Estilo NASA</title>
+  <style>
+    :root {
+      --bg-color: #0b0d17;
+      --card-bg: #151928;
+      --accent: #4fc3f7;
+      --text: #e0e6ed;
+    }
+
+    body {
+      margin: 0;
+      padding: 2rem;
+      background: var(--bg-color);
+      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      margin-bottom: 0.5rem;
+      color: #fff;
+    }
+
+    p.subtitle {
+      margin-top: 0;
+      color: #90a4ae;
+      font-size: 0.95rem;
+    }
+
+    .container {
+      background: var(--card-bg);
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      width: 100%;
+      height: 400px;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+      grid-column: 1 / -1;
+    }
+
+    button {
+      background: var(--accent);
+      color: #051329;
+      font-weight: 700;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    button:disabled {
+      background: #475569;
+      cursor: not-allowed;
+    }
+
+    .control-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.85rem;
+    }
+
+    input[type="range"], input[type="file"] {
+      width: 100%;
+    }
+
+    .legend {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      border-top: 1px solid #27334d;
+      padding-top: 0.75rem;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Sonificador de Imágenes</h1>
+  <p class="subtitle">Escaner espectral audiovisual inspirado en las sonificaciones de la NASA</p>
+
+  <div class="container">
+    <div class="canvas-wrapper">
+      <canvas id="imgCanvas"></canvas>
+      <canvas id="overlayCanvas"></canvas>
+    </div>
+
+    <div class="controls">
+      <div class="btn-group">
+        <button id="playBtn">▶ Iniciar Sonificación</button>
+        <button id="resetBtn" disabled>↺ Reiniciar</button>
+      </div>
+
+      <div class="control-item">
+        <label for="imgUpload">Cargar Imagen:</label>
+        <input type="file" id="imgUpload" accept="image/*">
+      </div>
+
+      <div class="control-item">
+        <label for="speedSlider">Velocidad de Escaneo:</label>
+        <input type="range" id="speedSlider" min="1" max="10" value="3">
+      </div>
+
+      <div class="control-item">
+        <label for="voicesSlider">Voces simultáneas (Resolución Y):</label>
+        <input type="range" id="voicesSlider" min="8" max="32" value="16" step="2">
+      </div>
+    </div>
+
+    <div class="legend">
+      <strong>Mapeo Espectral:</strong><br>
+      • <strong>R (Rojo):</strong> Tono y frecuencia base (Escala de órgano C3 a C6, combinada con la posición vertical).<br>
+      • <strong>G (Verde):</strong> Timbre y armónicos superiores tipo flauta/lengüeta.<br>
+      • <strong>B (Azul):</strong> Amplitud y resonancia espacial.
+    </div>
+  </div>
+
+  <script>
+    const imgCanvas = document.getElementById('imgCanvas');
+    const overlayCanvas = document.getElementById('overlayCanvas');
+    const ctxImg = imgCanvas.getContext('2d', { willReadFrequently: true });
+    const ctxOverlay = overlayCanvas.getContext('2d');
+
+    const playBtn = document.getElementById('playBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const imgUpload = document.getElementById('imgUpload');
+    const speedSlider = document.getElementById('speedSlider');
+    const voicesSlider = document.getElementById('voicesSlider');
+
+    let audioCtx = null;
+    let masterGain = null;
+    let isPlaying = false;
+    let scanX = 0;
+    let animationFrameId = null;
+    let currentImage = new Image();
+
+    // Escala pentatónica en frecuencias Hz (C3 a C6) para evitar disonancias bruscas
+    const PENTATONIC_SCALE = [
+      130.81, 146.83, 164.81, 196.00, 220.00,
+      261.63, 293.66, 329.63, 392.00, 440.00,
+      523.25, 587.33, 659.25, 783.99, 880.00, 1046.50
+    ];
+
+    function initDefaultImage() {
+      // Genera un gradiente espacial de prueba si no se carga imagen
+      imgCanvas.width = 600;
+      imgCanvas.height = 400;
+      overlayCanvas.width = 600;
+      overlayCanvas.height = 400;
+
+      const grad = ctxImg.createRadialGradient(300, 200, 20, 300, 200, 250);
+      grad.addColorStop(0, '#ff4b4b');
+      grad.addColorStop(0.3, '#ffaa00');
+      grad.addColorStop(0.6, '#00bfff');
+      grad.addColorStop(1, '#050515');
+      ctxImg.fillStyle = grad;
+      ctxImg.fillRect(0, 0, 600, 400);
+
+      // Estrellas simuladas
+      for (let i = 0; i < 50; i++) {
+        ctxImg.fillStyle = `rgba(255, 255, 255, ${Math.random()})`;
+        ctxImg.fillRect(Math.random() * 600, Math.random() * 400, 2, 2);
+      }
+    }
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        masterGain.connect(audioCtx.destination);
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Sintetizador de órgano aditivo para un punto específico
+    function playOrganTone(baseFreq, rVal, gVal, bVal, duration) {
+      if (!audioCtx || (rVal + gVal + bVal < 15)) return; // Ignora píxeles casi negros
+
+      const now = audioCtx.currentTime;
+      const fundamentalFreq = baseFreq * (1 + (rVal / 255) * 0.5); // R ajusta entonación fina/tono
+
+      const voiceGain = audioCtx.createGain();
+      const blueVol = (bVal / 255) * 0.08;
+      
+      // Envolvente rápida para evitar "clicks" de audio
+      voiceGain.gain.setValueAtTime(0.001, now);
+      voiceGain.gain.linearRampToValueAtTime(blueVol, now + 0.02);
+      voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      // Armónicos de órgano (1 fundamental + 2 sobretonos basados en G)
+      const harmonics = [1, 2, 3];
+      const gNorm = gVal / 255;
+
+      harmonics.forEach((h, index) => {
+        const osc = audioCtx.createOscillator();
+        const harmGain = audioCtx.createGain();
+
+        // Mezcla de formas de onda: fundamental senoidal, armónicos triangulares
+        osc.type = index === 0 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(fundamentalFreq * h, now);
+
+        const hAmp = index === 0 ? 1.0 : gNorm / (index + 1);
+        harmGain.gain.setValueAtTime(hAmp, now);
+
+        osc.connect(harmGain);
+        harmGain.connect(voiceGain);
+
+        osc.start(now);
+        osc.stop(now + duration);
+      });
+
+      voiceGain.connect(masterGain);
+    }
+
+    function scanStep() {
+      if (!isPlaying) return;
+
+      const numVoices = parseInt(voicesSlider.value, 10);
+      const stepY = imgCanvas.height / numVoices;
+      const duration = 0.08;
+
+      // Obtener píxeles de la columna actual
+      const colData = ctxImg.getImageData(Math.floor(scanX), 0, 1, imgCanvas.height).data;
+
+      for (let i = 0; i < numVoices; i++) {
+        const y = Math.floor(i * stepY);
+        const idx = y * 4;
+
+        const r = colData[idx];
+        const g = colData[idx + 1];
+        const b = colData[idx + 2];
+
+        // Mapeo vertical invertido (Y=0 es agudo, Y=max es grave) + escala
+        const noteIndex = Math.floor(((imgCanvas.height - y) / imgCanvas.height) * (PENTATONIC_SCALE.length - 1));
+        const baseFreq = PENTATONIC_SCALE[noteIndex];
+
+        playOrganTone(baseFreq, r, g, b, duration);
+      }
+
+      // Dibujar línea de escaneo
+      ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+      ctxOverlay.strokeStyle = 'rgba(79, 195, 247, 0.9)';
+      ctxOverlay.lineWidth = 2;
+      ctxOverlay.beginPath();
+      ctxOverlay.moveTo(scanX, 0);
+      ctxOverlay.lineTo(scanX, overlayCanvas.height);
+      ctxOverlay.stroke();
+
+      // Efecto de halo en la barra
+      ctxOverlay.fillStyle = 'rgba(79, 195, 247, 0.15)';
+      ctxOverlay.fillRect(scanX - 4, 0, 8, overlayCanvas.height);
+
+      // Avanzar barra
+      const speed = parseFloat(speedSlider.value);
+      scanX += speed;
+
+      if (scanX >= imgCanvas.width) {
+        stopSonification();
+        scanX = 0;
+        return;
+      }
+
+      animationFrameId = requestAnimationFrame(scanStep);
+    }
+
+    function startSonification() {
+      initAudio();
+      isPlaying = true;
+      playBtn.textContent = '⏸ Pausar';
+      resetBtn.disabled = false;
+      scanStep();
+    }
+
+    function stopSonification() {
+      isPlaying = false;
+      playBtn.textContent = '▶ Iniciar Sonificación';
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    }
+
+    playBtn.addEventListener('click', () => {
+      if (isPlaying) {
+        stopSonification();
+      } else {
+        startSonification();
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      stopSonification();
+      scanX = 0;
+      ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    });
+
+    imgUpload.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        currentImage.onload = () => {
+          imgCanvas.width = currentImage.width;
+          imgCanvas.height = currentImage.height;
+          overlayCanvas.width = currentImage.width;
+          overlayCanvas.height = currentImage.height;
+          ctxImg.drawImage(currentImage, 0, 0);
+          resetBtn.click();
+        };
+        currentImage.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    window.addEventListener('DOMContentLoaded', initDefaultImage);
+  </script>
+</body>
+</html>
+
