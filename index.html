@@ -143,6 +143,11 @@
       </div>
 
       <div class="control-item">
+        <label for="volSlider">Volumen Master:</label>
+        <input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.85">
+      </div>
+
+      <div class="control-item">
         <label for="speedSlider">Velocidad de Escaneo:</label>
         <input type="range" id="speedSlider" min="1" max="10" value="3">
       </div>
@@ -157,7 +162,7 @@
       <strong>Mapeo Espectral:</strong><br>
       • <strong>R (Rojo):</strong> Tono y frecuencia base (Escala pentatónica C3 a C6, combinada con la posición vertical).<br>
       • <strong>G (Verde):</strong> Timbre y armónicos superiores.<br>
-      • <strong>B (Azul):</strong> Amplitud y resonancia espacial.
+      • <strong>B (Azul):</strong> Amplitud y presencia sonora.
     </div>
   </div>
 
@@ -172,9 +177,11 @@
     const imgUpload = document.getElementById('imgUpload');
     const speedSlider = document.getElementById('speedSlider');
     const voicesSlider = document.getElementById('voicesSlider');
+    const volSlider = document.getElementById('volSlider');
 
     let audioCtx = null;
     let masterGain = null;
+    let compressor = null;
     let isPlaying = false;
     let scanX = 0;
     let animationFrameId = null;
@@ -210,16 +217,26 @@
     async function initAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Compresor/Limitador dinámico para evitar clipping a volumen alto
+        compressor = audioCtx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
+        compressor.knee.setValueAtTime(30, audioCtx.currentTime);
+        compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+        compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+        compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
         masterGain = audioCtx.createGain();
-        masterGain.gain.setValueAtTime(0.3, audioCtx.currentTime); // Ganancia master balanceada
-        masterGain.connect(audioCtx.destination);
+        masterGain.gain.setValueAtTime(parseFloat(volSlider.value), audioCtx.currentTime);
+
+        masterGain.connect(compressor);
+        compressor.connect(audioCtx.destination);
       }
       if (audioCtx.state === 'suspended') {
         await audioCtx.resume();
       }
     }
 
-    // Sintetizador con recolección de memoria y desconexión explícita
     function playOrganTone(baseFreq, rVal, gVal, bVal, duration) {
       if (!audioCtx || (rVal + gVal + bVal < 20)) return;
 
@@ -227,7 +244,7 @@
       const fundamentalFreq = baseFreq * (1 + (rVal / 255) * 0.4);
 
       const voiceGain = audioCtx.createGain();
-      const blueVol = (bVal / 255) * 0.04;
+      const blueVol = (bVal / 255) * 0.12; // Mayor amplitud por voz
 
       voiceGain.gain.setValueAtTime(0.0001, now);
       voiceGain.gain.linearRampToValueAtTime(blueVol, now + 0.01);
@@ -243,7 +260,7 @@
         osc.type = index === 0 ? 'sine' : 'triangle';
         osc.frequency.setValueAtTime(fundamentalFreq * h, now);
 
-        const hAmp = index === 0 ? 1.0 : (gNorm / (index + 1)) * 0.5;
+        const hAmp = index === 0 ? 1.0 : (gNorm / (index + 1)) * 0.8;
         harmGain.gain.setValueAtTime(hAmp, now);
 
         osc.connect(harmGain);
@@ -252,7 +269,7 @@
         osc.start(now);
         osc.stop(now + duration);
 
-        // Desconectar nodos al finalizar para liberar memoria
+        // Desconexión de nodos al terminar la oscilación
         osc.onended = () => {
           osc.disconnect();
           harmGain.disconnect();
@@ -261,7 +278,7 @@
 
       voiceGain.connect(masterGain);
 
-      // Desconectar el nodo de voz tras finalizar el ciclo de reproducción
+      // Desconexión del nodo de voz
       setTimeout(() => {
         voiceGain.disconnect();
       }, (duration + 0.05) * 1000);
@@ -291,7 +308,6 @@
         playOrganTone(baseFreq, r, g, b, duration);
       }
 
-      // Render de la barra de escaneo
       ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
       ctxOverlay.strokeStyle = 'rgba(79, 195, 247, 0.9)';
       ctxOverlay.lineWidth = 2;
@@ -344,6 +360,12 @@
       stopSonification();
       scanX = 0;
       ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    });
+
+    volSlider.addEventListener('input', (e) => {
+      if (masterGain && audioCtx) {
+        masterGain.gain.setValueAtTime(parseFloat(e.target.value), audioCtx.currentTime);
+      }
     });
 
     imgUpload.addEventListener('change', (e) => {
