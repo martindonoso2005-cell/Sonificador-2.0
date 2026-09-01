@@ -123,7 +123,7 @@
 <body>
 
   <h1>Sonificador de Imágenes</h1>
-  <p class="subtitle">Escaner espectral audiovisual inspirado en las sonificaciones de la NASA</p>
+  <p class="subtitle">Escáner espectral audiovisual inspirado en las sonificaciones de la NASA</p>
 
   <div class="container">
     <div class="canvas-wrapper">
@@ -155,8 +155,8 @@
 
     <div class="legend">
       <strong>Mapeo Espectral:</strong><br>
-      • <strong>R (Rojo):</strong> Tono y frecuencia base (Escala de órgano C3 a C6, combinada con la posición vertical).<br>
-      • <strong>G (Verde):</strong> Timbre y armónicos superiores tipo flauta/lengüeta.<br>
+      • <strong>R (Rojo):</strong> Tono y frecuencia base (Escala pentatónica C3 a C6, combinada con la posición vertical).<br>
+      • <strong>G (Verde):</strong> Timbre y armónicos superiores.<br>
       • <strong>B (Azul):</strong> Amplitud y resonancia espacial.
     </div>
   </div>
@@ -180,7 +180,7 @@
     let animationFrameId = null;
     let currentImage = new Image();
 
-    // Escala pentatónica en frecuencias Hz (C3 a C6) para evitar disonancias bruscas
+    // Escala pentatónica en frecuencias Hz (C3 a C6)
     const PENTATONIC_SCALE = [
       130.81, 146.83, 164.81, 196.00, 220.00,
       261.63, 293.66, 329.63, 392.00, 440.00,
@@ -188,7 +188,6 @@
     ];
 
     function initDefaultImage() {
-      // Genera un gradiente espacial de prueba si no se carga imagen
       imgCanvas.width = 600;
       imgCanvas.height = 400;
       overlayCanvas.width = 600;
@@ -202,41 +201,38 @@
       ctxImg.fillStyle = grad;
       ctxImg.fillRect(0, 0, 600, 400);
 
-      // Estrellas simuladas
       for (let i = 0; i < 50; i++) {
         ctxImg.fillStyle = `rgba(255, 255, 255, ${Math.random()})`;
         ctxImg.fillRect(Math.random() * 600, Math.random() * 400, 2, 2);
       }
     }
 
-    function initAudio() {
+    async function initAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         masterGain = audioCtx.createGain();
-        masterGain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+        masterGain.gain.setValueAtTime(0.3, audioCtx.currentTime); // Ganancia master balanceada
         masterGain.connect(audioCtx.destination);
       }
       if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
+        await audioCtx.resume();
       }
     }
 
-    // Sintetizador de órgano aditivo para un punto específico
+    // Sintetizador con recolección de memoria y desconexión explícita
     function playOrganTone(baseFreq, rVal, gVal, bVal, duration) {
-      if (!audioCtx || (rVal + gVal + bVal < 15)) return; // Ignora píxeles casi negros
+      if (!audioCtx || (rVal + gVal + bVal < 20)) return;
 
       const now = audioCtx.currentTime;
-      const fundamentalFreq = baseFreq * (1 + (rVal / 255) * 0.5); // R ajusta entonación fina/tono
+      const fundamentalFreq = baseFreq * (1 + (rVal / 255) * 0.4);
 
       const voiceGain = audioCtx.createGain();
-      const blueVol = (bVal / 255) * 0.08;
-      
-      // Envolvente rápida para evitar "clicks" de audio
-      voiceGain.gain.setValueAtTime(0.001, now);
-      voiceGain.gain.linearRampToValueAtTime(blueVol, now + 0.02);
+      const blueVol = (bVal / 255) * 0.04;
+
+      voiceGain.gain.setValueAtTime(0.0001, now);
+      voiceGain.gain.linearRampToValueAtTime(blueVol, now + 0.01);
       voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
-      // Armónicos de órgano (1 fundamental + 2 sobretonos basados en G)
       const harmonics = [1, 2, 3];
       const gNorm = gVal / 255;
 
@@ -244,11 +240,10 @@
         const osc = audioCtx.createOscillator();
         const harmGain = audioCtx.createGain();
 
-        // Mezcla de formas de onda: fundamental senoidal, armónicos triangulares
         osc.type = index === 0 ? 'sine' : 'triangle';
         osc.frequency.setValueAtTime(fundamentalFreq * h, now);
 
-        const hAmp = index === 0 ? 1.0 : gNorm / (index + 1);
+        const hAmp = index === 0 ? 1.0 : (gNorm / (index + 1)) * 0.5;
         harmGain.gain.setValueAtTime(hAmp, now);
 
         osc.connect(harmGain);
@@ -256,9 +251,20 @@
 
         osc.start(now);
         osc.stop(now + duration);
+
+        // Desconectar nodos al finalizar para liberar memoria
+        osc.onended = () => {
+          osc.disconnect();
+          harmGain.disconnect();
+        };
       });
 
       voiceGain.connect(masterGain);
+
+      // Desconectar el nodo de voz tras finalizar el ciclo de reproducción
+      setTimeout(() => {
+        voiceGain.disconnect();
+      }, (duration + 0.05) * 1000);
     }
 
     function scanStep() {
@@ -266,10 +272,10 @@
 
       const numVoices = parseInt(voicesSlider.value, 10);
       const stepY = imgCanvas.height / numVoices;
-      const duration = 0.08;
+      const duration = 0.07;
 
-      // Obtener píxeles de la columna actual
-      const colData = ctxImg.getImageData(Math.floor(scanX), 0, 1, imgCanvas.height).data;
+      const currentX = Math.min(Math.floor(scanX), imgCanvas.width - 1);
+      const colData = ctxImg.getImageData(currentX, 0, 1, imgCanvas.height).data;
 
       for (let i = 0; i < numVoices; i++) {
         const y = Math.floor(i * stepY);
@@ -279,14 +285,13 @@
         const g = colData[idx + 1];
         const b = colData[idx + 2];
 
-        // Mapeo vertical invertido (Y=0 es agudo, Y=max es grave) + escala
         const noteIndex = Math.floor(((imgCanvas.height - y) / imgCanvas.height) * (PENTATONIC_SCALE.length - 1));
         const baseFreq = PENTATONIC_SCALE[noteIndex];
 
         playOrganTone(baseFreq, r, g, b, duration);
       }
 
-      // Dibujar línea de escaneo
+      // Render de la barra de escaneo
       ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
       ctxOverlay.strokeStyle = 'rgba(79, 195, 247, 0.9)';
       ctxOverlay.lineWidth = 2;
@@ -295,11 +300,9 @@
       ctxOverlay.lineTo(scanX, overlayCanvas.height);
       ctxOverlay.stroke();
 
-      // Efecto de halo en la barra
       ctxOverlay.fillStyle = 'rgba(79, 195, 247, 0.15)';
       ctxOverlay.fillRect(scanX - 4, 0, 8, overlayCanvas.height);
 
-      // Avanzar barra
       const speed = parseFloat(speedSlider.value);
       scanX += speed;
 
@@ -312,8 +315,8 @@
       animationFrameId = requestAnimationFrame(scanStep);
     }
 
-    function startSonification() {
-      initAudio();
+    async function startSonification() {
+      await initAudio();
       isPlaying = true;
       playBtn.textContent = '⏸ Pausar';
       resetBtn.disabled = false;
@@ -323,7 +326,10 @@
     function stopSonification() {
       isPlaying = false;
       playBtn.textContent = '▶ Iniciar Sonificación';
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
     }
 
     playBtn.addEventListener('click', () => {
@@ -363,4 +369,3 @@
   </script>
 </body>
 </html>
-
