@@ -3,55 +3,132 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sonificador de Imágenes - Estilo NASA</title>
+  <title>Sonificador de Imágenes - Retro Pixel</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
   <style>
     :root {
-      --bg-color: #0b0d17;
-      --card-bg: #151928;
-      --accent: #4fc3f7;
-      --text: #e0e6ed;
+      --pixel-yellow: #ffcc00;
+      --pixel-amber: #e69c24;
+      --pixel-cyan: #00f0ff;
+      --pixel-red: #ff0055;
+      --ui-dark: rgba(14, 16, 27, 0.92);
+      --ui-border: #000000;
+      --text-main: #f4f4f4;
+      --text-muted: #8b9bb4;
+      --shadow-block: 4px 4px 0px #000000;
+      --shadow-block-lg: 6px 6px 0px #000000;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      image-rendering: pixelated;
     }
 
     body {
-      margin: 0;
-      padding: 2rem;
-      background: var(--bg-color);
-      color: var(--text);
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: 'Press Start 2P', monospace;
+      background-color: #04040c;
+      color: var(--text-main);
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
+      padding: 2.5rem 1rem 4rem;
+      position: relative;
+      overflow-x: hidden;
     }
 
+    /* Lienzo Nebulosa Carina */
+    #spaceCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      max-width: 900px;
+    }
+
+    /* Título pixel art amarillo */
     h1 {
-      margin-bottom: 0.5rem;
-      color: #fff;
+      font-family: 'Press Start 2P', monospace !important;
+      font-size: 1.35rem;
+      line-height: 1.5;
+      color: var(--pixel-yellow) !important;
+      text-shadow: 3px 3px 0px #000000 !important;
+      letter-spacing: -0.05em;
+      margin-bottom: 0.8rem;
     }
 
     p.subtitle {
-      margin-top: 0;
-      color: #90a4ae;
-      font-size: 0.95rem;
+      color: var(--pixel-cyan);
+      font-size: 0.65rem;
+      line-height: 1.8;
+      text-shadow: 2px 2px 0px #000;
     }
 
     .container {
-      background: var(--card-bg);
+      background: var(--ui-dark);
       padding: 1.5rem;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      border: 4px solid var(--ui-border);
+      box-shadow: var(--shadow-block-lg);
       display: flex;
       flex-direction: column;
-      gap: 1.2rem;
-      max-width: 800px;
+      gap: 1.5rem;
+      max-width: 820px;
       width: 100%;
+      backdrop-filter: blur(4px);
+    }
+
+    .window-header {
+      width: 100%;
+      background: #090a14;
+      border-bottom: 4px solid var(--ui-border);
+      padding: 0.5rem 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.2rem;
+    }
+
+    .window-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border: 1px solid #000;
+    }
+    .dot.red { background: var(--pixel-red); }
+    .dot.yellow { background: var(--pixel-yellow); }
+    .dot.green { background: #00ff66; }
+
+    .window-title {
+      font-size: 0.55rem;
+      color: var(--pixel-cyan);
     }
 
     .canvas-wrapper {
       position: relative;
       width: 100%;
-      height: 400px;
+      height: 380px;
       background: #000;
-      border-radius: 8px;
+      border: 4px solid var(--ui-border);
+      box-shadow: var(--shadow-block);
       overflow: hidden;
       display: flex;
       justify-content: center;
@@ -69,63 +146,117 @@
 
     .controls {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.2rem;
       align-items: center;
     }
 
     .btn-group {
       display: flex;
-      gap: 0.5rem;
+      gap: 0.8rem;
       grid-column: 1 / -1;
+      flex-wrap: wrap;
     }
 
     button {
-      background: var(--accent);
-      color: #051329;
-      font-weight: 700;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 6px;
+      font-family: inherit;
+      background: var(--pixel-yellow);
+      color: #000;
+      font-size: 0.65rem;
+      font-weight: bold;
+      border: 3px solid var(--ui-border);
+      padding: 0.8rem 1.2rem;
       cursor: pointer;
-      transition: opacity 0.2s;
+      box-shadow: var(--shadow-block);
+      transition: none;
     }
 
-    button:hover {
-      opacity: 0.9;
+    button:hover:not(:disabled) {
+      background: var(--pixel-amber);
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-block-lg);
+    }
+
+    button:active:not(:disabled) {
+      transform: translate(2px, 2px);
+      box-shadow: none;
     }
 
     button:disabled {
-      background: #475569;
+      background: #333a4d;
+      color: #717d96;
       cursor: not-allowed;
+      box-shadow: none;
+      border-color: #202430;
     }
 
     .control-item {
       display: flex;
       flex-direction: column;
-      gap: 0.3rem;
-      font-size: 0.85rem;
+      gap: 0.5rem;
+      font-size: 0.6rem;
     }
 
-    input[type="range"], input[type="file"] {
-      width: 100%;
+    .control-item label {
+      color: var(--pixel-cyan);
+      text-shadow: 1px 1px 0px #000;
+    }
+
+    input[type="range"] {
+      accent-color: var(--pixel-yellow);
+      cursor: pointer;
+    }
+
+    input[type="file"] {
+      font-family: inherit;
+      font-size: 0.55rem;
+      color: var(--text-main);
+      background: #090a14;
+      border: 2px solid var(--ui-border);
+      padding: 0.4rem;
     }
 
     .legend {
-      font-size: 0.85rem;
-      color: #94a3b8;
-      border-top: 1px solid #27334d;
-      padding-top: 0.75rem;
-      line-height: 1.4;
+      font-size: 0.55rem;
+      color: var(--text-muted);
+      border-top: 3px dashed var(--ui-border);
+      padding-top: 1rem;
+      line-height: 1.8;
+    }
+
+    .legend strong {
+      color: var(--pixel-yellow);
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 0.95rem;
+      }
+      .canvas-wrapper {
+        height: 260px;
+      }
     }
   </style>
 </head>
 <body>
 
-  <h1>Sonificador de Imágenes</h1>
-  <p class="subtitle">Escáner espectral audiovisual inspirado en las sonificaciones de la NASA</p>
+  <canvas id="spaceCanvas"></canvas>
+
+  <header>
+    <h1>SONIFICADOR DE IMÁGENES</h1>
+    <p class="subtitle">★ ESCÁNER ESPECTRAL AUDIOVISUAL ESTILO NASA ★</p>
+  </header>
 
   <div class="container">
+    <div class="window-header">
+      <div class="window-dots">
+        <div class="dot red"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+      </div>
+      <span class="window-title">SPECTRAL - SCANNER</span>
+    </div>
+
     <div class="canvas-wrapper">
       <canvas id="imgCanvas"></canvas>
       <canvas id="overlayCanvas"></canvas>
@@ -133,40 +264,142 @@
 
     <div class="controls">
       <div class="btn-group">
-        <button id="playBtn">▶ Iniciar Sonificación</button>
-        <button id="resetBtn" disabled>↺ Reiniciar</button>
+        <button id="playBtn">► INICIAR SONIFICACIÓN</button>
+        <button id="resetBtn" disabled>↺ REINICIAR</button>
       </div>
 
       <div class="control-item">
-        <label for="imgUpload">Cargar Imagen:</label>
+        <label for="imgUpload">CARGAR IMAGEN:</label>
         <input type="file" id="imgUpload" accept="image/*">
       </div>
 
       <div class="control-item">
-        <label for="volSlider">Volumen Master:</label>
+        <label for="volSlider">VOLUMEN MASTER:</label>
         <input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.85">
       </div>
 
       <div class="control-item">
-        <label for="speedSlider">Velocidad de Escaneo:</label>
+        <label for="speedSlider">VELOCIDAD ESCANEO:</label>
         <input type="range" id="speedSlider" min="1" max="10" value="3">
       </div>
 
       <div class="control-item">
-        <label for="voicesSlider">Voces simultáneas (Resolución Y):</label>
+        <label for="voicesSlider">VOCES VERTICALES (Y):</label>
         <input type="range" id="voicesSlider" min="8" max="32" value="16" step="2">
       </div>
     </div>
 
     <div class="legend">
-      <strong>Mapeo Espectral:</strong><br>
-      • <strong>R (Rojo):</strong> Tono y frecuencia base (Escala pentatónica C3 a C6, combinada con la posición vertical).<br>
-      • <strong>G (Verde):</strong> Timbre y armónicos superiores.<br>
-      • <strong>B (Azul):</strong> Amplitud y presencia sonora.
+      <strong>MAPEO ESPECTRAL:</strong><br>
+      • <strong>R (ROJO):</strong> Tono base (Escala pentatónica según altura vertical).<br>
+      • <strong>G (VERDE):</strong> Timbre y armónicos superiores.<br>
+      • <strong>B (AZUL):</strong> Amplitud y presencia de la onda sonora.
     </div>
   </div>
 
   <script>
+    /* ========================================================
+       FONDO PIXEL ART: NEBULOSA CARINA (JWST)
+       ======================================================== */
+    const spaceCanvas = document.getElementById('spaceCanvas');
+    const spaceCtx = spaceCanvas.getContext('2d');
+
+    const W = 320;
+    const H = 180;
+    spaceCanvas.width = W;
+    spaceCanvas.height = H;
+
+    function renderNebula() {
+      // 1. Cielo espacial profundo
+      const skyGrad = spaceCtx.createLinearGradient(0, 0, 0, H * 0.7);
+      skyGrad.addColorStop(0, '#04040c');
+      skyGrad.addColorStop(0.3, '#08112b');
+      skyGrad.addColorStop(0.7, '#0f3254');
+      skyGrad.addColorStop(1, '#1b5a7a');
+      spaceCtx.fillStyle = skyGrad;
+      spaceCtx.fillRect(0, 0, W, H);
+
+      // 2. Gas y polvo difuso
+      for (let i = 0; i < 400; i++) {
+        const x = Math.floor(Math.random() * W);
+        const y = Math.floor(Math.random() * (H * 0.65));
+        spaceCtx.fillStyle = Math.random() > 0.4 ? 'rgba(34, 130, 175, 0.25)' : 'rgba(235, 130, 60, 0.15)';
+        spaceCtx.fillRect(x, y, 2, 2);
+      }
+
+      // 3. Estrellas con picos de difracción de 8 puntas
+      const webbStars = [
+        {x: 60, y: 35, s: 2, c: '#ffed75'},
+        {x: 240, y: 40, s: 3, c: '#ffffff'},
+        {x: 180, y: 20, s: 1, c: '#8cedff'},
+        {x: 290, y: 70, s: 2, c: '#ffc857'},
+        {x: 120, y: 65, s: 1, c: '#ffffff'},
+        {x: 30, y: 80, s: 1, c: '#ffaa44'}
+      ];
+
+      webbStars.forEach(st => {
+        spaceCtx.fillStyle = st.c;
+        spaceCtx.fillRect(st.x - st.s, st.y - st.s, st.s * 2, st.s * 2);
+        for (let r = 1; r <= st.s * 4; r++) {
+          spaceCtx.fillRect(st.x + r, st.y, 1, 1);
+          spaceCtx.fillRect(st.x - r, st.y, 1, 1);
+          spaceCtx.fillRect(st.x, st.y + r, 1, 1);
+          spaceCtx.fillRect(st.x - r, st.y, 1, 1);
+          if (r % 2 === 0) {
+            spaceCtx.fillRect(st.x + r/2, st.y + r/2, 1, 1);
+            spaceCtx.fillRect(st.x - r/2, st.y - r/2, 1, 1);
+            spaceCtx.fillRect(st.x + r/2, st.y - r/2, 1, 1);
+            spaceCtx.fillRect(st.x - r/2, st.y + r/2, 1, 1);
+          }
+        }
+      });
+
+      // Estrellas menores
+      for (let s = 0; s < 120; s++) {
+        spaceCtx.fillStyle = Math.random() > 0.3 ? '#ffffff' : '#ffd085';
+        spaceCtx.fillRect(Math.floor(Math.random() * W), Math.floor(Math.random() * (H * 0.7)), 1, 1);
+      }
+
+      // 4. Riscos dorados / Cosmic Cliffs
+      function getMountainHeight(x) {
+        return Math.sin(x * 0.02) * 18 + 
+               Math.cos(x * 0.05) * 10 + 
+               Math.sin(x * 0.1) * 4 + 
+               (H * 0.52);
+      }
+
+      for (let x = 0; x < W; x++) {
+        const peakY = Math.floor(getMountainHeight(x));
+        for (let y = peakY; y < H; y++) {
+          const depth = y - peakY;
+          if (depth === 0) {
+            spaceCtx.fillStyle = (x % 3 === 0) ? '#fff5cc' : '#fca311';
+          } else if (depth < 4) {
+            spaceCtx.fillStyle = '#e85d04';
+          } else if (depth < 10) {
+            spaceCtx.fillStyle = '#dc2f02';
+          } else if (depth < 22) {
+            spaceCtx.fillStyle = '#9d0208';
+          } else if (depth < 45) {
+            spaceCtx.fillStyle = '#370617';
+          } else {
+            spaceCtx.fillStyle = '#140207';
+          }
+
+          if (depth === 2 || depth === 6 || depth === 14 || depth === 28) {
+            if ((x + y) % 2 === 0) spaceCtx.fillStyle = '#03071e';
+          }
+
+          spaceCtx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+
+    renderNebula();
+
+    /* ========================================================
+       SONIFICADOR DE IMÁGENES
+       ======================================================== */
     const imgCanvas = document.getElementById('imgCanvas');
     const overlayCanvas = document.getElementById('overlayCanvas');
     const ctxImg = imgCanvas.getContext('2d', { willReadFrequently: true });
@@ -187,7 +420,6 @@
     let animationFrameId = null;
     let currentImage = new Image();
 
-    // Escala pentatónica en frecuencias Hz (C3 a C6)
     const PENTATONIC_SCALE = [
       130.81, 146.83, 164.81, 196.00, 220.00,
       261.63, 293.66, 329.63, 392.00, 440.00,
@@ -218,7 +450,6 @@
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // Compresor/Limitador dinámico para evitar clipping a volumen alto
         compressor = audioCtx.createDynamicsCompressor();
         compressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
         compressor.knee.setValueAtTime(30, audioCtx.currentTime);
@@ -244,7 +475,7 @@
       const fundamentalFreq = baseFreq * (1 + (rVal / 255) * 0.4);
 
       const voiceGain = audioCtx.createGain();
-      const blueVol = (bVal / 255) * 0.12; // Mayor amplitud por voz
+      const blueVol = (bVal / 255) * 0.12;
 
       voiceGain.gain.setValueAtTime(0.0001, now);
       voiceGain.gain.linearRampToValueAtTime(blueVol, now + 0.01);
@@ -269,7 +500,6 @@
         osc.start(now);
         osc.stop(now + duration);
 
-        // Desconexión de nodos al terminar la oscilación
         osc.onended = () => {
           osc.disconnect();
           harmGain.disconnect();
@@ -278,7 +508,6 @@
 
       voiceGain.connect(masterGain);
 
-      // Desconexión del nodo de voz
       setTimeout(() => {
         voiceGain.disconnect();
       }, (duration + 0.05) * 1000);
@@ -309,14 +538,14 @@
       }
 
       ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-      ctxOverlay.strokeStyle = 'rgba(79, 195, 247, 0.9)';
-      ctxOverlay.lineWidth = 2;
+      ctxOverlay.strokeStyle = '#00f0ff';
+      ctxOverlay.lineWidth = 3;
       ctxOverlay.beginPath();
       ctxOverlay.moveTo(scanX, 0);
       ctxOverlay.lineTo(scanX, overlayCanvas.height);
       ctxOverlay.stroke();
 
-      ctxOverlay.fillStyle = 'rgba(79, 195, 247, 0.15)';
+      ctxOverlay.fillStyle = 'rgba(0, 240, 255, 0.2)';
       ctxOverlay.fillRect(scanX - 4, 0, 8, overlayCanvas.height);
 
       const speed = parseFloat(speedSlider.value);
@@ -334,14 +563,14 @@
     async function startSonification() {
       await initAudio();
       isPlaying = true;
-      playBtn.textContent = '⏸ Pausar';
+      playBtn.textContent = '❚❚ PAUSAR';
       resetBtn.disabled = false;
       scanStep();
     }
 
     function stopSonification() {
       isPlaying = false;
-      playBtn.textContent = '▶ Iniciar Sonificación';
+      playBtn.textContent = '► INICIAR SONIFICACIÓN';
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
