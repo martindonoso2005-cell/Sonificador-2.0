@@ -68,6 +68,13 @@ La interfaz ofrece control total sobre los parámetros de renderizado sonoro en 
 [ ¿X >= Ancho de Imagen? ]
        ├── SÍ ──► Detener y reiniciar X = 0
        └── NO ──► Siguiente frame
+```
+
+---
+
 ## 5. Estructura del Repositorio
+
+```text
 ├── index.html        # Aplicación web completa (estructura HTML, estilos retro y motor Web Audio API)
 └── README.md         # Documentación técnica, justificación metodológica y guía de uso
+```
